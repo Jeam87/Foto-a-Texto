@@ -4,6 +4,8 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
-  "theme_color": "#0f172a",
-  "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/2991/2991112.png", "sizes": "512x512", "type": "image/png" }]
+  "theme_color": "#22c55e",
+  "icons": [
+    { "src": "IMG-20260828-WA3179.jpg", "sizes": "512x512", "type": "image/jpeg" }
+  ]
 }
