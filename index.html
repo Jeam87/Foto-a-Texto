@@ -1,5 +1,44 @@
-<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Foto a Texto</title><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script><style>body{background:#0f172a;color:#fff;font-family:sans-serif;padding:15px}.card{background:#1e293b;padding:20px;border-radius:16px;max-width:500px;margin:auto;text-align:center}textarea{width:100%;height:200px;background:#000;color:#0f0;border-radius:10px;padding:12px;margin-top:10px}button{background:#22c55e;color:#000;border:0;padding:12px;width:100%;border-radius:10px;font-weight:bold;margin-top:10px}#bar{height:20px;background:#22c55e;width:0%;border-radius:6px}</style></head><body><div class="card"><h2>📝 FOTO A TEXTO</h2><input type="file" id="f" accept="image/*"><div style="background:#334155;border-radius:10px;padding:4px;margin-top:10px"><div id="bar"></div></div><p id="st" style="font-size:12px">Esperando foto...</p><textarea id="out" placeholder="Aquí aparecerá el texto..."></textarea><button onclick="copy()">COPIAR TEXTO</button></div><script>document.getElementById('f').onchange=e=>{let file=e.target.files[0];let bar=document.getElementById('bar');let st=document.getElementById('st');Tesseract.recognize(file,'spa',{logger:m=>{if(m.progress){bar.style.width=Math.round(m.progress*100)+'%';st.textContent='Leyendo... '+Math.round(m.progress*100)+'%' }}}).then(r=>{document.getElementById('out').value=r.data.text;st.textContent='¡Listo!';bar.style.width='100%'})};function copy(){let t=document.getElementById('out');t.select();document.execCommand('copy');alert('Copiado')}</script></body></html>
-<link rel="manifest" href="manifest.json">
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0f172a">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon.png">
+<link rel="icon" href="IMG-20260828-WA3179.jpg">
+<link rel="apple-touch-icon" href="IMG-20260828-WA3179.jpg">
+<title>Foto a Texto</title>
+<style>
+body{font-family:system-ui;background:#0f172a;color:white;text-align:center;padding:20px}
+.card{background:#1e293b;padding:20px;border-radius:16px;margin-top:20px}
+button{background:#22c55e;border:0;padding:12px 20px;border-radius:10px;font-weight:bold;color:black;margin:5px}
+textarea{width:100%;height:200px;border-radius:10px;padding:10px;margin-top:10px}
+input{margin:15px 0}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body>
+<h2>📸 Foto a Texto</h2>
+<p>Toma foto a tus apuntes y cópialos</p>
+<div class="card">
+<input type="file" id="foto" accept="image/*" capture="camera">
+<div id="estado"></div>
+<textarea id="texto" placeholder="Aquí aparecerá el texto..."></textarea><br>
+<button onclick="copiar()">Copiar texto</button>
+</div>
+<script>
+const foto=document.getElementById('foto');
+const texto=document.getElementById('texto');
+const estado=document.getElementById('estado');
+foto.onchange=async(e)=>{
+ const file=e.target.files[0];
+ if(!file)return;
+ estado.innerText="⏳ Leyendo... espera";
+ const {data:{text}}=await Tesseract.recognize(file,'spa+eng');
+ texto.value=text;
+ estado.innerText="✅ Listo";
+}
+function copiar(){texto.select();document.execCommand('copy');alert('Copiado!')}
+</script>
+</body>
+</html>
