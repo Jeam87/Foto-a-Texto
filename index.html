@@ -7,60 +7,117 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="IMG-20260828-WA3179.jpg">
 <link rel="apple-touch-icon" href="IMG-20260828-WA3179.jpg">
-<title>Foto a Texto</title>
+<title>Foto a Texto Pro</title>
 <style>
-body{font-family:system-ui;background:#0f172a;color:white;text-align:center;padding:20px}
-.card{background:#1e293b;padding:20px;border-radius:16px;margin-top:15px}
-button{background:#22c55e;border:0;padding:14px 20px;border-radius:12px;font-weight:bold;color:black;margin:6px;width:90%;font-size:16px}
+body{font-family:system-ui;background:#0f172a;color:white;text-align:center;padding:16px;margin:0}
+.card{background:#1e293b;padding:16px;border-radius:16px;margin-top:12px;text-align:left}
+button{background:#22c55e;border:0;padding:12px 16px;border-radius:10px;font-weight:bold;color:black;margin:4px;font-size:14px}
 button.sec{background:#334155;color:white}
-textarea{width:100%;height:220px;border-radius:12px;padding:12px;margin-top:12px;box-sizing:border-box}
-#preview{max-width:100%;border-radius:12px;margin-top:10px;display:none}
+button.small{padding:8px 10px;font-size:12px}
+textarea{width:100%;height:180px;border-radius:10px;padding:10px;box-sizing:border-box;margin-top:8px}
+#preview{max-width:100%;border-radius:10px;margin-top:8px;display:none}
+.hist-item{background:#0f172a;padding:10px;border-radius:10px;margin:8px 0;font-size:13px;white-space:pre-wrap;max-height:80px;overflow:hidden;position:relative}
+.hist-item b{color:#22c55e}
+.topbar{display:flex;justify-content:space-between;align-items:center}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
-<h2>📸 Foto a Texto</h2>
-<p>Toca para elegir foto o tomar foto</p>
+<h2 style="margin:0">📸 Foto a Texto Pro</h2>
+<p style="opacity:.7;font-size:14px">Galería + Cámara + Historial</p>
+
 <div class="card">
 <input type="file" id="fotoGaleria" accept="image/*" hidden>
 <input type="file" id="fotoCamara" accept="image/*" capture="environment" hidden>
-
-<button onclick="document.getElementById('fotoGaleria').click()">🖼️ Elegir de Galería</button>
-<button class="sec" onclick="document.getElementById('fotoCamara').click()">📷 Tomar Foto</button>
-
+<div style="text-align:center">
+<button onclick="document.getElementById('fotoGaleria').click()">🖼️ Galería</button>
+<button class="sec" onclick="document.getElementById('fotoCamara').click()">📷 Cámara</button>
+</div>
 <img id="preview">
-<div id="estado" style="margin-top:12px"></div>
-<textarea id="texto" placeholder="Aquí aparecerá el texto de tu imagen..."></textarea><br>
-<button onclick="copiar()">📋 Copiar texto</button>
+<div id="estado" style="text-align:center;margin:8px 0;font-size:13px;opacity:.8"></div>
+<textarea id="texto" placeholder="Aquí aparecerá el texto..."></textarea>
+<div style="text-align:center">
+<button onclick="copiar()">📋 Copiar</button>
+<button class="sec" onclick="compartirWA()">🟢 WhatsApp</button>
+<button class="sec" onclick="compartir()">📤 Compartir</button>
+<button class="sec" onclick="guardarHistorial()">💾 Guardar</button>
+</div>
+</div>
+
+<div class="card">
+<div class="topbar"><h3 style="margin:0">🕘 Historial</h3><button class="small sec" onclick="borrarHistorial()">Borrar todo</button></div>
+<div id="historial"></div>
 </div>
 
 <script>
-const galeria = document.getElementById('fotoGaleria');
-const camara = document.getElementById('fotoCamara');
-const texto = document.getElementById('texto');
-const estado = document.getElementById('estado');
-const preview = document.getElementById('preview');
+const galeria=document.getElementById('fotoGaleria');
+const camara=document.getElementById('fotoCamara');
+const texto=document.getElementById('texto');
+const estado=document.getElementById('estado');
+const preview=document.getElementById('preview');
+const histDiv=document.getElementById('historial');
 
 function procesar(file){
  if(!file) return;
- preview.src = URL.createObjectURL(file);
+ preview.src=URL.createObjectURL(file);
  preview.style.display='block';
- estado.innerText="⏳ Leyendo imagen... no cierres";
+ estado.innerText="⏳ Leyendo... mejorando imagen";
  texto.value="";
- Tesseract.recognize(file, 'spa+eng').then(({data:{text}})=>{
-   texto.value=text;
-   estado.innerText="✅ Listo, ya puedes copiar";
- }).catch(()=>{ estado.innerText="❌ No pude leer la foto, prueba otra más clara"; });
+ // Mejora de lectura: escala y más precisión
+ Tesseract.recognize(file,'spa+eng',{logger:m=>{if(m.status=='recognizing text')estado.innerText=`⏳ ${Math.round(m.progress*100)}%`}}).then(({data:{text}})=>{
+   texto.value=text.trim();
+   estado.innerText=text.trim()?"✅ Listo":"⚠️ No detecté texto, prueba más cerca y con luz";
+   if(text.trim()) guardarHistorial(true);
+ });
+}
+galeria.onchange=e=>procesar(e.target.files[0]);
+camara.onchange=e=>procesar(e.target.files[0]);
+
+function copiar(){texto.select();document.execCommand('copy');estado.innerText="📋 Copiado";}
+
+function compartir(){
+ if(navigator.share){navigator.share({title:'Texto escaneado',text:texto.value});}
+ else{copiar();}
+}
+function compartirWA(){
+ const t=encodeURIComponent(texto.value);
+ window.open(`https://wa.me/?text=${t}`,'_blank');
 }
 
-galeria.onchange = e => procesar(e.target.files[0]);
-camara.onchange = e => procesar(e.target.files[0]);
-
-function copiar(){
- texto.select();
- document.execCommand('copy');
- alert('¡Copiado!');
+function guardarHistorial(auto=false){
+ if(!texto.value.trim()) return;
+ let hist=JSON.parse(localStorage.getItem('ft_hist')||'[]');
+ hist.unshift({fecha:new Date().toLocaleString(),texto:texto.value.slice(0,800)});
+ hist=hist.slice(0,30);
+ localStorage.setItem('ft_hist',JSON.stringify(hist));
+ renderHist();
+ if(!auto) estado.innerText="💾 Guardado en historial";
 }
+function renderHist(){
+ let hist=JSON.parse(localStorage.getItem('ft_hist')||'[]');
+ histDiv.innerHTML=hist.length?'':'<p style="opacity:.5;text-align:center">Vacío</p>';
+ hist.forEach((h,i)=>{
+   const d=document.createElement('div');
+   d.className='hist-item';
+   d.innerHTML=`<b>${h.fecha}</b><br>${h.texto}<br><button class="small sec" onclick="usarHist(${i})">Usar</button> <button class="small" onclick="borrarUno(${i})">X</button>`;
+   histDiv.appendChild(d);
+ });
+}
+function usarHist(i){
+ let hist=JSON.parse(localStorage.getItem('ft_hist')||'[]');
+ texto.value=hist[i].texto;
+ window.scrollTo(0,0);
+}
+function borrarUno(i){
+ let hist=JSON.parse(localStorage.getItem('ft_hist')||'[]');
+ hist.splice(i,1);
+ localStorage.setItem('ft_hist',JSON.stringify(hist));
+ renderHist();
+}
+function borrarHistorial(){
+ if(confirm('¿Borrar historial?')){localStorage.removeItem('ft_hist');renderHist();}
+}
+renderHist();
 </script>
 </body>
-</html>
+</html> 
