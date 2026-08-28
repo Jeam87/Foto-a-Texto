@@ -1,1 +1,8 @@
-# Foto-a-Texto
+from flask import Flask, render_template_string
+app = Flask(__name__)
+HTML = """<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Foto a Texto - Jacona</title><script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script><style>body{background:#0f172a;color:#fff;font-family:sans-serif;padding:15px}.card{background:#1e293b;padding:20px;border-radius:16px;max-width:500px;margin:auto;text-align:center}textarea{width:100%;height:200px;background:#000;color:#0f0;border-radius:10px;padding:12px;margin-top:10px}button{background:#22c55e;color:#000;border:0;padding:12px;width:100%;border-radius:10px;font-weight:bold;margin-top:10px}#bar{height:20px;background:#22c55e;width:0%;border-radius:6px}</style></head><body><div class="card"><h2>FOTO A TEXTO</h2><p style="color:#94a3b8">Toma foto de cualquier texto</p><input type="file" id="f" accept="image/*"><div style="background:#334155;border-radius:10px;padding:4px;margin-top:10px"><div id="bar"></div></div><p id="st" style="font-size:12px">Esperando foto...</p><textarea id="out" placeholder="Aqui aparecera el texto..."></textarea><button onclick="copy()">COPIAR TEXTO</button></div><script>
+document.getElementById('f').onchange=e=>{let file=e.target.files[0];let bar=document.getElementById('bar');let st=document.getElementById('st');Tesseract.recognize(file,'spa',{logger:m=>{if(m.progress){bar.style.width=Math.round(m.progress*100)+'%';st.textContent='Leyendo... '+Math.round(m.progress*100)+'%' }}}).then(r=>{document.getElementById('out').value=r.data.text;st.textContent='Listo!';bar.style.width='100%'})}
+function copy(){let t=document.getElementById('out');t.select();document.execCommand('copy');alert('Copiado')}
+</script></body></html>"""
+@app.route('/')
+def h(): return render_template_string(HTML)
