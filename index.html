@@ -10,35 +10,57 @@
 <title>Foto a Texto</title>
 <style>
 body{font-family:system-ui;background:#0f172a;color:white;text-align:center;padding:20px}
-.card{background:#1e293b;padding:20px;border-radius:16px;margin-top:20px}
-button{background:#22c55e;border:0;padding:12px 20px;border-radius:10px;font-weight:bold;color:black;margin:5px}
-textarea{width:100%;height:200px;border-radius:10px;padding:10px;margin-top:10px}
-input{margin:15px 0}
+.card{background:#1e293b;padding:20px;border-radius:16px;margin-top:15px}
+button{background:#22c55e;border:0;padding:14px 20px;border-radius:12px;font-weight:bold;color:black;margin:6px;width:90%;font-size:16px}
+button.sec{background:#334155;color:white}
+textarea{width:100%;height:220px;border-radius:12px;padding:12px;margin-top:12px;box-sizing:border-box}
+#preview{max-width:100%;border-radius:12px;margin-top:10px;display:none}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 <h2>📸 Foto a Texto</h2>
-<p>Toma foto a tus apuntes y cópialos</p>
+<p>Toca para elegir foto o tomar foto</p>
 <div class="card">
-<input type="file" id="foto" accept="image/*" capture="camera">
-<div id="estado"></div>
-<textarea id="texto" placeholder="Aquí aparecerá el texto..."></textarea><br>
-<button onclick="copiar()">Copiar texto</button>
+<input type="file" id="fotoGaleria" accept="image/*" hidden>
+<input type="file" id="fotoCamara" accept="image/*" capture="environment" hidden>
+
+<button onclick="document.getElementById('fotoGaleria').click()">🖼️ Elegir de Galería</button>
+<button class="sec" onclick="document.getElementById('fotoCamara').click()">📷 Tomar Foto</button>
+
+<img id="preview">
+<div id="estado" style="margin-top:12px"></div>
+<textarea id="texto" placeholder="Aquí aparecerá el texto de tu imagen..."></textarea><br>
+<button onclick="copiar()">📋 Copiar texto</button>
 </div>
+
 <script>
-const foto=document.getElementById('foto');
-const texto=document.getElementById('texto');
-const estado=document.getElementById('estado');
-foto.onchange=async(e)=>{
- const file=e.target.files[0];
- if(!file)return;
- estado.innerText="⏳ Leyendo... espera";
- const {data:{text}}=await Tesseract.recognize(file,'spa+eng');
- texto.value=text;
- estado.innerText="✅ Listo";
+const galeria = document.getElementById('fotoGaleria');
+const camara = document.getElementById('fotoCamara');
+const texto = document.getElementById('texto');
+const estado = document.getElementById('estado');
+const preview = document.getElementById('preview');
+
+function procesar(file){
+ if(!file) return;
+ preview.src = URL.createObjectURL(file);
+ preview.style.display='block';
+ estado.innerText="⏳ Leyendo imagen... no cierres";
+ texto.value="";
+ Tesseract.recognize(file, 'spa+eng').then(({data:{text}})=>{
+   texto.value=text;
+   estado.innerText="✅ Listo, ya puedes copiar";
+ }).catch(()=>{ estado.innerText="❌ No pude leer la foto, prueba otra más clara"; });
 }
-function copiar(){texto.select();document.execCommand('copy');alert('Copiado!')}
+
+galeria.onchange = e => procesar(e.target.files[0]);
+camara.onchange = e => procesar(e.target.files[0]);
+
+function copiar(){
+ texto.select();
+ document.execCommand('copy');
+ alert('¡Copiado!');
+}
 </script>
 </body>
 </html>
