@@ -1,0 +1,9 @@
+{
+  "name": "Foto a Texto",
+  "short_name": "FotoTexto",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/2991/2991112.png", "sizes": "512x512", "type": "image/png" }]
+}
