@@ -6,6 +6,10 @@
   "background_color": "#0f172a",
   "theme_color": "#22c55e",
   "icons": [
-    { "src": "IMG-20260828-WA3179.jpg", "sizes": "512x512", "type": "image/jpeg" }
+    {
+      "src": "IMG-20260828-WA3179.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
   ]
 }
