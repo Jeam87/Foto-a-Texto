@@ -5,26 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0f172a">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="IMG-20260828-WA3179.jpg">
-<link rel="apple-touch-icon" href="IMG-20260828-WA3179.jpg">
-<title>Foto a Texto Pro</title>
+<title>Foto a Texto + Ticket 58mm</title>
 <style>
-body{font-family:system-ui;background:#0f172a;color:white;text-align:center;padding:16px;margin:0}
+body{font-family:system-ui;background:#0f172a;color:white;text-align:center;padding:16px;margin:0;padding-bottom:80px}
 .card{background:#1e293b;padding:16px;border-radius:16px;margin-top:12px;text-align:left}
 button{background:#22c55e;border:0;padding:12px 16px;border-radius:10px;font-weight:bold;color:black;margin:4px;font-size:14px}
 button.sec{background:#334155;color:white}
-button.small{padding:8px 10px;font-size:12px}
-textarea{width:100%;height:180px;border-radius:10px;padding:10px;box-sizing:border-box;margin-top:8px}
+button.print{background:#f59e0b}
+textarea{width:100%;height:150px;border-radius:10px;padding:10px;box-sizing:border-box;margin-top:8px}
 #preview{max-width:100%;border-radius:10px;margin-top:8px;display:none}
-.hist-item{background:#0f172a;padding:10px;border-radius:10px;margin:8px 0;font-size:13px;white-space:pre-wrap;max-height:80px;overflow:hidden;position:relative}
-.hist-item b{color:#22c55e}
-.topbar{display:flex;justify-content:space-between;align-items:center}
+#canvasPrint{display:none}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
-<h2 style="margin:0">📸 Foto a Texto Pro</h2>
-<p style="opacity:.7;font-size:14px">Galería + Cámara + Historial</p>
+<h2>📸 + 🖨️ 58mm</h2>
 
 <div class="card">
 <input type="file" id="fotoGaleria" accept="image/*" hidden>
@@ -33,91 +28,126 @@ textarea{width:100%;height:180px;border-radius:10px;padding:10px;box-sizing:bord
 <button onclick="document.getElementById('fotoGaleria').click()">🖼️ Galería</button>
 <button class="sec" onclick="document.getElementById('fotoCamara').click()">📷 Cámara</button>
 </div>
-<img id="preview">
+<img id="preview"><canvas id="canvasPrint"></canvas>
 <div id="estado" style="text-align:center;margin:8px 0;font-size:13px;opacity:.8"></div>
-<textarea id="texto" placeholder="Aquí aparecerá el texto..."></textarea>
+<textarea id="texto" placeholder="Texto detectado..."></textarea>
 <div style="text-align:center">
 <button onclick="copiar()">📋 Copiar</button>
-<button class="sec" onclick="compartirWA()">🟢 WhatsApp</button>
-<button class="sec" onclick="compartir()">📤 Compartir</button>
-<button class="sec" onclick="guardarHistorial()">💾 Guardar</button>
+<button class="print" onclick="conectarEImprimir()">🖨️ Imprimir Foto Ticket</button>
+<button class="sec" onclick="imprimirTexto()">🖨️ Imprimir Texto</button>
 </div>
-</div>
-
-<div class="card">
-<div class="topbar"><h3 style="margin:0">🕘 Historial</h3><button class="small sec" onclick="borrarHistorial()">Borrar todo</button></div>
-<div id="historial"></div>
+<p style="font-size:11px;opacity:.6;text-align:center">Para impresora Bluetooth 58mm. Usa Chrome Android.</p>
 </div>
 
 <script>
-const galeria=document.getElementById('fotoGaleria');
-const camara=document.getElementById('fotoCamara');
+let device, characteristic;
+const preview=document.getElementById('preview');
 const texto=document.getElementById('texto');
 const estado=document.getElementById('estado');
-const preview=document.getElementById('preview');
-const histDiv=document.getElementById('historial');
+const canvas=document.getElementById('canvasPrint');
 
 function procesar(file){
  if(!file) return;
  preview.src=URL.createObjectURL(file);
  preview.style.display='block';
- estado.innerText="⏳ Leyendo... mejorando imagen";
- texto.value="";
- // Mejora de lectura: escala y más precisión
+ estado.innerText="⏳ Leyendo...";
  Tesseract.recognize(file,'spa+eng',{logger:m=>{if(m.status=='recognizing text')estado.innerText=`⏳ ${Math.round(m.progress*100)}%`}}).then(({data:{text}})=>{
-   texto.value=text.trim();
-   estado.innerText=text.trim()?"✅ Listo":"⚠️ No detecté texto, prueba más cerca y con luz";
-   if(text.trim()) guardarHistorial(true);
+   texto.value=text.trim(); estado.innerText="✅ Listo";
  });
 }
-galeria.onchange=e=>procesar(e.target.files[0]);
-camara.onchange=e=>procesar(e.target.files[0]);
-
+document.getElementById('fotoGaleria').onchange=e=>procesar(e.target.files[0]);
+document.getElementById('fotoCamara').onchange=e=>procesar(e.target.files[0]);
 function copiar(){texto.select();document.execCommand('copy');estado.innerText="📋 Copiado";}
 
-function compartir(){
- if(navigator.share){navigator.share({title:'Texto escaneado',text:texto.value});}
- else{copiar();}
-}
-function compartirWA(){
- const t=encodeURIComponent(texto.value);
- window.open(`https://wa.me/?text=${t}`,'_blank');
+// --- IMPRESION 58mm ESC/POS ---
+async function conectarEImprimir(){
+ try{
+  if(!device){
+   estado.innerText="🔍 Buscando impresora...";
+   device = await navigator.bluetooth.requestDevice({
+    filters:[{services:['000018f0-0000-1000-8000-00805f9b34fb']}],
+    optionalServices:['000018f0-0000-1000-8000-00805f9b34fb','e7810a71-73ae-499d-8c15-faa9aef0c3f2','0000ff00-0000-1000-8000-00805f9b34fb']
+   });
+   const server = await device.gatt.connect();
+   const service = await server.getPrimaryServices().then(s=>s[0]);
+   const chars = await service.getCharacteristics();
+   characteristic = chars.find(c=>c.properties.write || c.properties.writeWithoutResponse);
+  }
+  imprimirImagenEnTicket();
+ }catch(e){
+   estado.innerText="⚠️ Usa Chrome y activa Bluetooth. Error: "+e.message;
+   // Fallback: intentar con cualquier dispositivo
+   try{
+    device = await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:['000018f0-0000-1000-8000-00805f9b34fb','e7810a71-73ae-499d-8c15-faa9aef0c3f2']});
+    const server = await device.gatt.connect();
+    const services = await server.getPrimaryServices();
+    for(let s of services){
+      let chars = await s.getCharacteristics();
+      for(let c of chars){ if(c.properties.write){ characteristic=c; break; } }
+    }
+    if(characteristic) imprimirImagenEnTicket();
+   }catch(e2){ estado.innerText="❌ No se conectó: "+e2.message; }
+ }
 }
 
-function guardarHistorial(auto=false){
- if(!texto.value.trim()) return;
- let hist=JSON.parse(localStorage.getItem('ft_hist')||'[]');
- hist.unshift({fecha:new Date().toLocaleString(),texto:texto.value.slice(0,800)});
- hist=hist.slice(0,30);
- localStorage.setItem('ft_hist',JSON.stringify(hist));
- renderHist();
- if(!auto) estado.innerText="💾 Guardado en historial";
+async function imprimirImagenEnTicket(){
+ if(!preview.src){ estado.innerText="❌ Primero carga foto"; return; }
+ estado.innerText="🖨️ Preparando imagen 58mm...";
+ const img = new Image();
+ img.src = preview.src;
+ await img.decode();
+ const W = 384; // 58mm = 384px
+ const h = Math.round((W / img.width) * img.height);
+ canvas.width=W; canvas.height=h;
+ const ctx=canvas.getContext('2d');
+ ctx.drawImage(img,0,0,W,h);
+ let imageData=ctx.getImageData(0,0,W,h);
+ // blanco y negro
+ for(let i=0;i<imageData.data.length;i+=4){
+   let avg=(imageData.data[i]+imageData.data[i+1]+imageData.data[i+2])/3;
+   let val=avg>128?255:0;
+   imageData.data[i]=imageData.data[i+1]=imageData.data[i+2]=val;
+ }
+ ctx.putImageData(imageData,0,0);
+
+ // Convertir a ESC/POS raster
+ const data=[];
+ data.push(0x1B,0x40); // init
+ const bytesPerLine = Math.ceil(W/8);
+ for(let y=0;y<h;y+=24){
+   data.push(0x1B,0x2A,33, bytesPerLine&0xFF, (bytesPerLine>>8)&0xFF);
+   for(let x=0;x<W;x++){
+     for(let k=0;k<3;k++){
+       let slice=0;
+       for(let b=0;b<8;b++){
+         let yy=y+k*8+b;
+         if(yy>=h) continue;
+         let pixel=ctx.getImageData(x,yy,1,1).data[0]<128?1:0;
+         slice |= pixel << (7-b);
+       }
+       data.push(slice);
+     }
+   }
+   data.push(0x0A);
+ }
+ data.push(0x0A,0x0A,0x0A,0x1D,0x56,0x00); // cortar
+
+ const chunkSize=100;
+ for(let i=0;i<data.length;i+=chunkSize){
+   await characteristic.writeValue(new Uint8Array(data.slice(i,i+chunkSize)));
+   await new Promise(r=>setTimeout(r,50));
+ }
+ estado.innerText="✅ Enviado a impresora";
 }
-function renderHist(){
- let hist=JSON.parse(localStorage.getItem('ft_hist')||'[]');
- histDiv.innerHTML=hist.length?'':'<p style="opacity:.5;text-align:center">Vacío</p>';
- hist.forEach((h,i)=>{
-   const d=document.createElement('div');
-   d.className='hist-item';
-   d.innerHTML=`<b>${h.fecha}</b><br>${h.texto}<br><button class="small sec" onclick="usarHist(${i})">Usar</button> <button class="small" onclick="borrarUno(${i})">X</button>`;
-   histDiv.appendChild(d);
- });
+
+async function imprimirTexto(){
+ if(!characteristic){ estado.innerText="❌ Primero conecta con Imprimir Foto"; return;}
+ let t=texto.value;
+ let enc=new TextEncoder();
+ let cmds=[0x1B,0x40,...enc.encode(t), 0x0A,0x0A,0x0A,0x1D,0x56,0x00];
+ await characteristic.writeValue(new Uint8Array(cmds));
+ estado.innerText="✅ Texto enviado";
 }
-function usarHist(i){
- let hist=JSON.parse(localStorage.getItem('ft_hist')||'[]');
- texto.value=hist[i].texto;
- window.scrollTo(0,0);
-}
-function borrarUno(i){
- let hist=JSON.parse(localStorage.getItem('ft_hist')||'[]');
- hist.splice(i,1);
- localStorage.setItem('ft_hist',JSON.stringify(hist));
- renderHist();
-}
-function borrarHistorial(){
- if(confirm('¿Borrar historial?')){localStorage.removeItem('ft_hist');renderHist();}
-}
-renderHist();
 </script>
 </body>
 </html> 
