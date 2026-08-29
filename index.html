@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0f172a">
 <link rel="manifest" href="manifest.json">
-<title>Foto a Texto + Ticket 58mm</title>
+<title>Foto a Texto + Ticket 58mm v3</title>
 <style>
 body{font-family:system-ui;background:#0f172a;color:white;text-align:center;padding:16px;margin:0;padding-bottom:80px}
 .card{background:#1e293b;padding:16px;border-radius:16px;margin-top:12px;text-align:left}
@@ -19,8 +19,7 @@ textarea{width:100%;height:150px;border-radius:10px;padding:10px;box-sizing:bord
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
-<h2>📸 + 🖨️ 58mm</h2>
-
+<h2>📸 + 🖨️ 58mm FIX</h2>
 <div class="card">
 <input type="file" id="fotoGaleria" accept="image/*" hidden>
 <input type="file" id="fotoCamara" accept="image/*" capture="environment" hidden>
@@ -29,125 +28,8 @@ textarea{width:100%;height:150px;border-radius:10px;padding:10px;box-sizing:bord
 <button class="sec" onclick="document.getElementById('fotoCamara').click()">📷 Cámara</button>
 </div>
 <img id="preview"><canvas id="canvasPrint"></canvas>
-<div id="estado" style="text-align:center;margin:8px 0;font-size:13px;opacity:.8"></div>
+<div id="estado" style="text-align:center;margin:8px 0;font-size:13px;opacity:.8">Listo</div>
 <textarea id="texto" placeholder="Texto detectado..."></textarea>
 <div style="text-align:center">
 <button onclick="copiar()">📋 Copiar</button>
-<button class="print" onclick="conectarEImprimir()">🖨️ Imprimir Foto Ticket</button>
-<button class="sec" onclick="imprimirTexto()">🖨️ Imprimir Texto</button>
-</div>
-<p style="font-size:11px;opacity:.6;text-align:center">Para impresora Bluetooth 58mm. Usa Chrome Android.</p>
-</div>
-
-<script>
-let device, characteristic;
-const preview=document.getElementById('preview');
-const texto=document.getElementById('texto');
-const estado=document.getElementById('estado');
-const canvas=document.getElementById('canvasPrint');
-
-function procesar(file){
- if(!file) return;
- preview.src=URL.createObjectURL(file);
- preview.style.display='block';
- estado.innerText="⏳ Leyendo...";
- Tesseract.recognize(file,'spa+eng',{logger:m=>{if(m.status=='recognizing text')estado.innerText=`⏳ ${Math.round(m.progress*100)}%`}}).then(({data:{text}})=>{
-   texto.value=text.trim(); estado.innerText="✅ Listo";
- });
-}
-document.getElementById('fotoGaleria').onchange=e=>procesar(e.target.files[0]);
-document.getElementById('fotoCamara').onchange=e=>procesar(e.target.files[0]);
-function copiar(){texto.select();document.execCommand('copy');estado.innerText="📋 Copiado";}
-
-// --- IMPRESION 58mm ESC/POS ---
-async function conectarEImprimir(){
- try{
-  if(!device){
-   estado.innerText="🔍 Buscando impresora...";
-   device = await navigator.bluetooth.requestDevice({
-    filters:[{services:['000018f0-0000-1000-8000-00805f9b34fb']}],
-    optionalServices:['000018f0-0000-1000-8000-00805f9b34fb','e7810a71-73ae-499d-8c15-faa9aef0c3f2','0000ff00-0000-1000-8000-00805f9b34fb']
-   });
-   const server = await device.gatt.connect();
-   const service = await server.getPrimaryServices().then(s=>s[0]);
-   const chars = await service.getCharacteristics();
-   characteristic = chars.find(c=>c.properties.write || c.properties.writeWithoutResponse);
-  }
-  imprimirImagenEnTicket();
- }catch(e){
-   estado.innerText="⚠️ Usa Chrome y activa Bluetooth. Error: "+e.message;
-   // Fallback: intentar con cualquier dispositivo
-   try{
-    device = await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:['000018f0-0000-1000-8000-00805f9b34fb','e7810a71-73ae-499d-8c15-faa9aef0c3f2']});
-    const server = await device.gatt.connect();
-    const services = await server.getPrimaryServices();
-    for(let s of services){
-      let chars = await s.getCharacteristics();
-      for(let c of chars){ if(c.properties.write){ characteristic=c; break; } }
-    }
-    if(characteristic) imprimirImagenEnTicket();
-   }catch(e2){ estado.innerText="❌ No se conectó: "+e2.message; }
- }
-}
-
-async function imprimirImagenEnTicket(){
- if(!preview.src){ estado.innerText="❌ Primero carga foto"; return; }
- estado.innerText="🖨️ Preparando imagen 58mm...";
- const img = new Image();
- img.src = preview.src;
- await img.decode();
- const W = 384; // 58mm = 384px
- const h = Math.round((W / img.width) * img.height);
- canvas.width=W; canvas.height=h;
- const ctx=canvas.getContext('2d');
- ctx.drawImage(img,0,0,W,h);
- let imageData=ctx.getImageData(0,0,W,h);
- // blanco y negro
- for(let i=0;i<imageData.data.length;i+=4){
-   let avg=(imageData.data[i]+imageData.data[i+1]+imageData.data[i+2])/3;
-   let val=avg>128?255:0;
-   imageData.data[i]=imageData.data[i+1]=imageData.data[i+2]=val;
- }
- ctx.putImageData(imageData,0,0);
-
- // Convertir a ESC/POS raster
- const data=[];
- data.push(0x1B,0x40); // init
- const bytesPerLine = Math.ceil(W/8);
- for(let y=0;y<h;y+=24){
-   data.push(0x1B,0x2A,33, bytesPerLine&0xFF, (bytesPerLine>>8)&0xFF);
-   for(let x=0;x<W;x++){
-     for(let k=0;k<3;k++){
-       let slice=0;
-       for(let b=0;b<8;b++){
-         let yy=y+k*8+b;
-         if(yy>=h) continue;
-         let pixel=ctx.getImageData(x,yy,1,1).data[0]<128?1:0;
-         slice |= pixel << (7-b);
-       }
-       data.push(slice);
-     }
-   }
-   data.push(0x0A);
- }
- data.push(0x0A,0x0A,0x0A,0x1D,0x56,0x00); // cortar
-
- const chunkSize=100;
- for(let i=0;i<data.length;i+=chunkSize){
-   await characteristic.writeValue(new Uint8Array(data.slice(i,i+chunkSize)));
-   await new Promise(r=>setTimeout(r,50));
- }
- estado.innerText="✅ Enviado a impresora";
-}
-
-async function imprimirTexto(){
- if(!characteristic){ estado.innerText="❌ Primero conecta con Imprimir Foto"; return;}
- let t=texto.value;
- let enc=new TextEncoder();
- let cmds=[0x1B,0x40,...enc.encode(t), 0x0A,0x0A,0x0A,0x1D,0x56,0x00];
- await characteristic.writeValue(new Uint8Array(cmds));
- estado.innerText="✅ Texto enviado";
-}
-</script>
-</body>
-</html> 
+<button class="print" onclick="conectarEImprimir()">🖨️ Imprimir FOTO Ticket 
