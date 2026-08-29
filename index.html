@@ -3,111 +3,49 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JK-5801H Foto Texto</title>
+<title>Foto a Texto</title>
 <style>
-body{font-family:system-ui;background:#0f172a;color:white;padding:16px;text-align:center}
-.card{background:#1e293b;padding:14px;border-radius:14px}
-button{padding:12px 16px;border-radius:10px;border:0;font-weight:bold;margin:5px}
-.b1{background:#f59e0b;color:black}
-.b2{background:#334155;color:white}
-.b3{background:#22c55e;color:black}
-img{max-width:100%;border-radius:10px;margin-top:8px}
-textarea{width:100%;height:120px;border-radius:10px;padding:8px;box-sizing:border-box;margin-top:8px}
-canvas{display:none}
-#log{font-size:13px;margin:8px}
+body{font-family:system-ui;background:#0f172a;color:white;text-align:center;padding:16px}
+.card{background:#1e293b;padding:16px;border-radius:16px;margin-top:12px;text-align:left}
+button{background:#22c55e;border:0;padding:12px 16px;border-radius:10px;font-weight:bold;color:black;margin:4px}
+button.sec{background:#334155;color:white}
+textarea{width:100%;height:150px;border-radius:10px;padding:10px;box-sizing:border-box;margin-top:8px}
+#preview{max-width:100%;border-radius:10px;margin-top:8px;display:none}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
-<h3>JK-5801H - Foto Texto</h3>
+<h2>📸 Foto a Texto</h2>
 <div class="card">
-<input type="file" id="gal" accept="image/*" hidden>
-<input type="file" id="cam" accept="image/*" capture="environment" hidden>
-<button class="b2" onclick="gal.click()">🖼️ Galería</button>
-<button class="b2" onclick="cam.click()">📷 Cámara</button>
-<img id="prev"><canvas id="cv"></canvas>
-<div id="log">1. Carga foto - 2. Lee texto - 3. Guarda imagen para RawBT</div>
-<textarea id="txt" placeholder="Texto detectado aquí..."></textarea><br>
-<button class="b3" onclick="leerTexto()">🔤 Leer Texto</button>
-<button class="b1" onclick="prepararParaRawBT()">🖨️ Preparar Foto para 58mm</button>
-<button class="b2" onclick="imprimirTextoDirecto()">🖨️ Imprimir SOLO TEXTO (directo)</button>
-<p style="font-size:11px;opacity:.6">Para FOTO: instala RawBT de Play Store. La JK-5801H no imprime fotos directo desde Chrome, solo texto.</p>
+<input type="file" id="fotoGaleria" accept="image/*" hidden>
+<input type="file" id="fotoCamara" accept="image/*" capture="environment" hidden>
+<div style="text-align:center">
+<button onclick="document.getElementById('fotoGaleria').click()">🖼️ Galería</button>
+<button class="sec" onclick="document.getElementById('fotoCamara').click()">📷 Cámara</button>
 </div>
-
+<img id="preview">
+<div id="estado" style="text-align:center;margin:8px 0;font-size:13px">Listo</div>
+<textarea id="texto" placeholder="Aquí sale el texto..."></textarea>
+<div style="text-align:center">
+<button onclick="copiar()">📋 Copiar</button>
+</div>
+</div>
 <script>
-const gal=document.getElementById('gal');
-const cam=document.getElementById('cam');
-const prev=document.getElementById('prev');
-const log=document.getElementById('log');
-const txt=document.getElementById('txt');
-const cv=document.getElementById('cv');
-let fotoDataURL="";
-let charac=null;
-
-function cargar(f){
- if(!f) return;
- const r=new FileReader();
- r.onload=e=>{ fotoDataURL=e.target.result; prev.src=fotoDataURL; prev.style.display='block'; log.innerText="✅ Foto cargada"; };
- r.readAsDataURL(f);
+const preview=document.getElementById('preview');
+const texto=document.getElementById('texto');
+const estado=document.getElementById('estado');
+function procesar(file){
+ if(!file) return;
+ preview.src=URL.createObjectURL(file);
+ preview.style.display='block';
+ estado.innerText="⏳ Leyendo texto...";
+ Tesseract.recognize(file,'spa+eng',{logger:m=>{if(m.status=='recognizing text')estado.innerText=`⏳ ${Math.round(m.progress*100)}%`}}).then(({data:{text}})=>{
+   texto.value=text.trim(); estado.innerText="✅ Listo";
+ });
 }
-gal.onchange=e=>cargar(e.target.files[0]);
-cam.onchange=e=>cargar(e.target.files[0]);
-
-async function leerTexto(){
- if(!fotoDataURL) return alert("Carga foto");
- log.innerText="⏳ Leyendo...";
- const res=await Tesseract.recognize(fotoDataURL,'spa+eng');
- txt.value=res.data.text;
- log.innerText="✅ Texto listo";
-}
-
-// ESTA ES LA CLAVE PARA TU JK-5801H
-async function prepararParaRawBT(){
- if(!fotoDataURL) return alert("Carga foto");
- const img=new Image(); img.src=fotoDataURL; await img.decode();
- const W=384;
- const H=Math.round(W/img.width*img.height);
- cv.width=W; cv.height=H;
- const ctx=cv.getContext('2d');
- ctx.fillStyle="white"; ctx.fillRect(0,0,W,H);
- ctx.drawImage(img,0,0,W,H);
- // convertir a B/N bien contrastado
- let d=ctx.getImageData(0,0,W,H);
- for(let i=0;i<d.data.length;i+=4){
-   let avg=(d.data[i]+d.data[i+1]+d.data[i+2])/3;
-   d.data[i]=d.data[i+1]=d.data[i+2]= avg>125?255:0;
- }
- ctx.putImageData(d,0,0);
- // descargar
- const url=cv.toDataURL("image/png");
- const a=document.createElement('a');
- a.href=url; a.download="ticket-58mm.png"; a.click();
- log.innerText="✅ Imagen guardada. Abre RawBT > Imagen > Imprime";
- // Intenta compartir directo a RawBT
- if(navigator.share){
-   const blob=await (await fetch(url)).blob();
-   const file=new File([blob],"ticket.png",{type:"image/png"});
-   try{ await navigator.share({files:[file], title:"Ticket"}); }catch{}
- }
-}
-
-async function imprimirTextoDirecto(){
- if(!txt.value) return alert("No hay texto");
- try{
-  const dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:['000018f0-0000-1000-8000-00805f9b34fb','e7810a71-73ae-499d-8c15-faa9aef0c3f2']});
-  const server=await dev.gatt.connect();
-  const services=await server.getPrimaryServices();
-  for(let s of services){
-    const cs=await s.getCharacteristics();
-    for(let c of cs){ if(c.properties.write||c.properties.writeWithoutResponse){ charac=c; break; } }
-    if(charac) break;
-  }
-  const enc=new TextEncoder();
-  const data=new Uint8Array([...[0x1B,0x40,0x1B,0x61,0x01],...enc.encode(txt.value),10,10,10,0x1D,0x56,0x00]);
-  await charac.writeValue(data);
-  log.innerText="✅ Texto impreso directo";
- }catch(e){ log.innerText="Para texto usa RawBT también. Error: "+e.message; }
-}
+document.getElementById('fotoGaleria').onchange=e=>procesar(e.target.files[0]);
+document.getElementById('fotoCamara').onchange=e=>procesar(e.target.files[0]);
+function copiar(){texto.select();document.execCommand('copy');estado.innerText="📋 Copiado";}
 </script>
 </body>
-</html>
+</html> 
