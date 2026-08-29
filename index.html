@@ -3,33 +3,100 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0f172a">
-<link rel="manifest" href="manifest.json">
-<title>Foto a Texto + Ticket 58mm v3</title>
+<title>Test 58mm Foto</title>
 <style>
-body{font-family:system-ui;background:#0f172a;color:white;text-align:center;padding:16px;margin:0;padding-bottom:80px}
-.card{background:#1e293b;padding:16px;border-radius:16px;margin-top:12px;text-align:left}
-button{background:#22c55e;border:0;padding:12px 16px;border-radius:10px;font-weight:bold;color:black;margin:4px;font-size:14px}
+body{font-family:system-ui;background:#0f172a;color:white;text-align:center;padding:20px}
+button{background:#f59e0b;border:0;padding:14px 20px;border-radius:12px;font-weight:bold;margin:6px}
 button.sec{background:#334155;color:white}
-button.print{background:#f59e0b}
-textarea{width:100%;height:150px;border-radius:10px;padding:10px;box-sizing:border-box;margin-top:8px}
-#preview{max-width:100%;border-radius:10px;margin-top:8px;display:none}
-#canvasPrint{display:none}
+img{max-width:100%;margin-top:10px;border-radius:10px;display:none}
+#estado{margin:10px;font-size:14px}
+canvas{display:none}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
-<h2>📸 + 🖨️ 58mm FIX</h2>
-<div class="card">
-<input type="file" id="fotoGaleria" accept="image/*" hidden>
-<input type="file" id="fotoCamara" accept="image/*" capture="environment" hidden>
-<div style="text-align:center">
-<button onclick="document.getElementById('fotoGaleria').click()">🖼️ Galería</button>
-<button class="sec" onclick="document.getElementById('fotoCamara').click()">📷 Cámara</button>
-</div>
-<img id="preview"><canvas id="canvasPrint"></canvas>
-<div id="estado" style="text-align:center;margin:8px 0;font-size:13px;opacity:.8">Listo</div>
-<textarea id="texto" placeholder="Texto detectado..."></textarea>
-<div style="text-align:center">
-<button onclick="copiar()">📋 Copiar</button>
-<button class="print" onclick="conectarEImprimir()">🖨️ Imprimir FOTO Ticket 
+<h2>Test Foto 58mm</h2>
+<input type="file" id="file" accept="image/*" hidden>
+<button onclick="document.getElementById('file').click()">🖼️ Cargar Foto</button>
+<button class="sec" id="btnPrint" onclick="conectarEImprimir()">🖨️ Conectar e Imprimir</button>
+<div id="estado">Selecciona foto</div>
+<img id="preview">
+<canvas id="c"></canvas>
+
+<script>
+let device, characteristic;
+const fileInput=document.getElementById('file');
+const preview=document.getElementById('preview');
+const estado=document.getElementById('estado');
+const canvas=document.getElementById('c');
+
+fileInput.onchange=e=>{
+ const f=e.target.files[0];
+ if(!f) return;
+ const reader=new FileReader();
+ reader.onload=ev=>{
+   preview.src=ev.target.result;
+   preview.style.display='block';
+   estado.innerText="✅ Foto cargada: "+f.name;
+ };
+ reader.readAsDataURL(f);
+};
+
+async function conectarEImprimir(){
+ if(!preview.src || preview.src==""){ estado.innerText="❌ Carga foto primero"; return; }
+ try{
+  estado.innerText="🔍 Buscando impresora...";
+  device = await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:['000018f0-0000-1000-8000-00805f9b34fb','e7810a71-73ae-499d-8c15-faa9aef0c3f2','0000ff00-0000-1000-8000-00805f9b34fb']});
+  const server=await device.gatt.connect();
+  const services=await server.getPrimaryServices();
+  for(let s of services){
+    let chars=await s.getCharacteristics();
+    for(let c of chars){ if(c.properties.write || c.properties.writeWithoutResponse){ characteristic=c; break; } }
+    if(characteristic) break;
+  }
+  if(!characteristic) throw new Error("Sin escritura");
+  imprimir();
+ }catch(e){ estado.innerText="❌ "+e.message; }
+}
+
+async function imprimir(){
+ estado.innerText="🖨️ Convirtiendo...";
+ const img=new Image();
+ img.src=preview.src;
+ await img.decode();
+ const W=384;
+ const h=Math.round(W/img.width*img.height);
+ canvas.width=W; canvas.height=h;
+ const ctx=canvas.getContext('2d',{willReadFrequently:true});
+ ctx.fillStyle="white"; ctx.fillRect(0,0,W,h);
+ ctx.drawImage(img,0,0,W,h);
+ let d=ctx.getImageData(0,0,W,h);
+ for(let i=0;i<d.data.length;i+=4){
+   let avg=(d.data[i]+d.data[i+1]+d.data[i+2])/3;
+   let v=avg>130?255:0;
+   d.data[i]=d.data[i+1]=d.data[i+2]=v;
+ }
+ ctx.putImageData(d,0,0);
+ const wb=Math.ceil(W/8);
+ const buf=[];
+ for(let y=0;y<h;y++){
+   for(let xb=0;xb<wb;xb++){
+     let byte=0;
+     for(let b=0;b<8;b++){
+       let x=xb*8+b;
+       if(x>=W) continue;
+       if(ctx.getImageData(x,y,1,1).data[0]===0) byte|=(1<<(7-b));
+     }
+     buf.push(byte);
+   }
+ }
+ let full=[0x1B,0x40,0x1D,0x76,0x30,0x00,wb&0xFF,(wb>>8)&0xFF,h&0xFF,(h>>8)&0xFF,...buf,0x0A,0x0A,0x0A,0x1D,0x56,0x00];
+ for(let i=0;i<full.length;i+=100){
+   try{ await characteristic.writeValueWithoutResponse(new Uint8Array(full.slice(i,i+100))); }
+   catch{ await characteristic.writeValue(new Uint8Array(full.slice(i,i+100))); }
+   await new Promise(r=>setTimeout(r,30));
+ }
+ estado.innerText="✅ Impreso";
+}
+</script>
+</body>
+</html>
