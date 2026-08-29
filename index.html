@@ -3,14 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Foto a Texto</title>
+<meta name="theme-color" content="#0f172a">
+<title>Foto a Texto + Compartir</title>
 <style>
-body{font-family:system-ui;background:#0f172a;color:white;text-align:center;padding:16px}
+body{font-family:system-ui;background:#0f172a;color:white;text-align:center;padding:16px;margin:0;padding-bottom:30px}
 .card{background:#1e293b;padding:16px;border-radius:16px;margin-top:12px;text-align:left}
-button{background:#22c55e;border:0;padding:12px 16px;border-radius:10px;font-weight:bold;color:black;margin:4px}
+button{background:#22c55e;border:0;padding:12px 14px;border-radius:10px;font-weight:bold;color:black;margin:4px;font-size:14px}
 button.sec{background:#334155;color:white}
-textarea{width:100%;height:150px;border-radius:10px;padding:10px;box-sizing:border-box;margin-top:8px}
+button.wa{background:#25D366;color:white}
+button.share{background:#0ea5e9;color:white}
+textarea{width:100%;height:180px;border-radius:10px;padding:10px;box-sizing:border-box;margin-top:8px;font-size:15px}
 #preview{max-width:100%;border-radius:10px;margin-top:8px;display:none}
+#estado{ text-align:center; margin:8px 0; font-size:13px; opacity:.8 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
@@ -24,28 +28,65 @@ textarea{width:100%;height:150px;border-radius:10px;padding:10px;box-sizing:bord
 <button class="sec" onclick="document.getElementById('fotoCamara').click()">📷 Cámara</button>
 </div>
 <img id="preview">
-<div id="estado" style="text-align:center;margin:8px 0;font-size:13px">Listo</div>
-<textarea id="texto" placeholder="Aquí sale el texto..."></textarea>
-<div style="text-align:center">
+<div id="estado">Listo para cargar foto</div>
+<textarea id="texto" placeholder="Aquí sale el texto detectado..."></textarea>
+<div style="text-align:center; margin-top:10px">
 <button onclick="copiar()">📋 Copiar</button>
+<button class="share" onclick="compartir()">📤 Compartir</button>
+<button class="wa" onclick="compartirWhatsApp()">💬 WhatsApp</button>
 </div>
 </div>
+
 <script>
 const preview=document.getElementById('preview');
 const texto=document.getElementById('texto');
 const estado=document.getElementById('estado');
+
 function procesar(file){
  if(!file) return;
  preview.src=URL.createObjectURL(file);
  preview.style.display='block';
- estado.innerText="⏳ Leyendo texto...";
- Tesseract.recognize(file,'spa+eng',{logger:m=>{if(m.status=='recognizing text')estado.innerText=`⏳ ${Math.round(m.progress*100)}%`}}).then(({data:{text}})=>{
-   texto.value=text.trim(); estado.innerText="✅ Listo";
+ estado.innerText="⏳ Leyendo texto... 0%";
+ Tesseract.recognize(file,'spa+eng',{
+   logger:m=>{
+     if(m.status=='recognizing text'){
+       estado.innerText=`⏳ Leyendo ${Math.round(m.progress*100)}%`;
+     }
+   }
+ }).then(({data:{text}})=>{
+   texto.value=text.trim();
+   estado.innerText="✅ Texto listo";
  });
 }
+
 document.getElementById('fotoGaleria').onchange=e=>procesar(e.target.files[0]);
 document.getElementById('fotoCamara').onchange=e=>procesar(e.target.files[0]);
-function copiar(){texto.select();document.execCommand('copy');estado.innerText="📋 Copiado";}
+
+function copiar(){
+ if(!texto.value) return;
+ texto.select();
+ document.execCommand('copy');
+ estado.innerText="📋 Copiado al portapapeles";
+}
+
+async function compartir(){
+ if(!texto.value) return alert("No hay texto para compartir");
+ if(navigator.share){
+   try{
+     await navigator.share({ title: 'Texto de foto', text: texto.value });
+     estado.innerText="📤 Compartido";
+   }catch(e){}
+ } else {
+   copiar();
+   alert("Texto copiado, pégalo donde quieras compartir");
+ }
+}
+
+function compartirWhatsApp(){
+ if(!texto.value) return alert("No hay texto");
+ let t=encodeURIComponent(texto.value);
+ window.open(`https://wa.me/?text=${t}`, '_blank');
+}
 </script>
 </body>
-</html> 
+</html>
