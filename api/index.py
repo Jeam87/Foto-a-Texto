@@ -56,12 +56,4 @@ function copiar(){
 @app.route('/')
 def home():
     return HTML
-"""
-
-4. Dale `Commit changes`
-
-Espera 40 segundos y recarga `foto-a-texto.vercel.app`
-
-Ya te va a salir la app completa con botón para subir foto, que te saca el texto TAL CUAL está en la imagen, sin resumir ni cambiar nada. Es 100% gratis y no necesita API key, todo lo hace tu celular.
-
-Pruébala y mándame captura ya jalando con una foto.
+"
