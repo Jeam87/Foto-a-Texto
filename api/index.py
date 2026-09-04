@@ -1,13 +1,15 @@
 from flask import Flask
 app = Flask(__name__)
 
-HTML = """
+@app.route('/')
+def home():
+    return """
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Foto a Texto - 100% Exacto</title>
+<title>Foto a Texto</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 body{background:#000;color:#fff;font-family:sans-serif;text-align:center;margin:0;padding:20px}
@@ -20,12 +22,12 @@ img{max-width:100%;margin-top:15px;border-radius:10px}
 </head>
 <body>
 <div class="box">
-<h1>📸 Foto a Texto<br><small style="font-size:12px;color:#888">100% EXACTO - no cambia palabras</small></h1>
+<h1>Foto a Texto<br><small style="font-size:12px;color:#888">100% EXACTO</small></h1>
 <input type="file" id="foto" accept="image/*">
 <button onclick="leer()">LEER FOTO</button>
 <p id="estado" style="color:yellow"></p>
 <img id="preview" style="display:none">
-<textarea id="texto" placeholder="Aquí saldrá el texto 100% exacto..."></textarea>
+<textarea id="texto" placeholder="Aqui saldra el texto exacto..."></textarea>
 <button onclick="copiar()" style="background:#0f0">COPIAR TODO</button>
 </div>
 <script>
@@ -37,23 +39,16 @@ document.getElementById('foto').addEventListener('change', e=>{
   img.style.display='block';
 });
 async function leer(){
-  if(!archivo){alert('Primero elige una foto');return}
-  document.getElementById('estado').innerText='Leyendo... espera 5-10 seg (100% exacto)';
-  const { data: { text } } = await Tesseract.recognize(archivo, 'spa+eng', { logger: m=>{} });
+  if(!archivo){alert('Elige una foto');return}
+  document.getElementById('estado').innerText='Leyendo... 5-10 seg';
+  const { data: { text } } = await Tesseract.recognize(archivo, 'spa+eng');
   document.getElementById('texto').value=text;
-  document.getElementById('estado').innerText='¡Listo! Texto 100% exacto';
+  document.getElementById('estado').innerText='Listo!';
 }
 function copiar(){
-  let t=document.getElementById('texto');
-  t.select(); document.execCommand('copy');
-  alert('¡Copiado!');
+  let t=document.getElementById('texto'); t.select(); document.execCommand('copy'); alert('Copiado!');
 }
 </script>
 </body>
 </html>
-"""
-
-@app.route('/')
-def home():
-    return HTML
-"
+""" 
