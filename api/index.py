@@ -87,6 +87,40 @@ function autoActivarPro(tipo){
   document.getElementById('paywall-box').innerHTML = '<h2 style="font-weight:bold;font-size:20px">¡Pago recibido! 🎉</h2><p style="margin-top:10px;color:#666">Ya eres PRO por ' + dias + ' días.<br>Cierra Mercado Pago y recarga la página.</p><button onclick="location.reload()" style="margin-top:16px;background:#000;color:#fff;padding:10px 20px;border-radius:10px">Ya pagué, activar PRO</button>';
 }
 
+
+async function prepararImagenOCR(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      // Aumentar la resolución ayuda especialmente con letras y números pequeños.
+      const escala = Math.min(3, Math.max(1.5, 1800 / Math.max(img.width, img.height)));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * escala);
+      canvas.height = Math.round(img.height * escala);
+
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // Escala de grises + contraste suave, sin inventar ni modificar caracteres.
+      const datos = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < datos.data.length; i += 4) {
+        const gris = Math.round(
+          0.299 * datos.data[i] +
+          0.587 * datos.data[i + 1] +
+          0.114 * datos.data[i + 2]
+        );
+        datos.data[i] = gris;
+        datos.data[i + 1] = gris;
+        datos.data[i + 2] = gris;
+      }
+      ctx.putImageData(datos, 0, 0);
+
+      canvas.toBlob(blob => resolve(blob), 'image/png', 1.0);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 document.getElementById('drop').onclick = () => document.getElementById('file').click();
 document.getElementById('file').onchange = (e) => {
   fileData = e.target.files[0];
@@ -111,10 +145,28 @@ document.getElementById('file').onchange = (e) => {
 document.getElementById('btn').onclick = async () => {
   if(!fileData) return alert('Primero sube una foto');
   if(!checkPaywall()) return;
+  document.getElementById('loading').innerText = 'Preparando y leyendo la imagen... ⏳';
   document.getElementById('loading').classList.remove('hidden');
   document.getElementById('resultado').classList.add('hidden');
   try{
-    const { data: { text } } = await Tesseract.recognize(fileData, 'spa');
+    // Preprocesar la imagen para mejorar la lectura sin cambiar letras ni números.
+    const imagenProcesada = await prepararImagenOCR(fileData);
+
+    // PSM 6: bloque de texto uniforme. Se conserva literalmente lo detectado.
+    const { data: { text } } = await Tesseract.recognize(
+      imagenProcesada,
+      'spa',
+      {
+        logger: m => {
+          if (m.status === 'recognizing text' && typeof m.progress === 'number') {
+            document.getElementById('loading').innerText =
+              `Leyendo imagen... ${Math.round(m.progress * 100)}% ⏳`;
+          }
+        }
+      }
+    );
+
+    // NO hacer autocorrecciones: se muestra exactamente el resultado del OCR.
     document.getElementById('resultado').value = text;
     document.getElementById('resultado').classList.remove('hidden');
     document.getElementById('copiar').classList.remove('hidden');
