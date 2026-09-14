@@ -88,7 +88,25 @@ function autoActivarPro(tipo){
 }
 
 document.getElementById('drop').onclick = () => document.getElementById('file').click();
-document.getElementById('file').onchange = (e) => { fileData = e.target.files[0]; document.getElementById('drop').innerHTML = '✅ ' + fileData.name; };
+document.getElementById('file').onchange = (e) => {
+  fileData = e.target.files[0];
+  if (!fileData) return;
+
+  const drop = document.getElementById('drop');
+  const oldPreview = document.getElementById('previewFoto');
+  if (oldPreview) oldPreview.remove();
+
+  const img = document.createElement('img');
+  img.id = 'previewFoto';
+  img.className = 'mx-auto max-h-64 max-w-full rounded-xl object-contain shadow-sm';
+  img.alt = 'Foto seleccionada';
+  img.src = URL.createObjectURL(fileData);
+
+  const texto = drop.querySelector('p');
+  if (texto) texto.textContent = '📷 Foto seleccionada — toca para cambiarla';
+
+  drop.appendChild(img);
+};
 
 document.getElementById('btn').onclick = async () => {
   if(!fileData) return alert('Primero sube una foto');
@@ -118,3 +136,4 @@ document.getElementById('copiar').onclick = () => {
 </body>
 </html>
 """
+ 
