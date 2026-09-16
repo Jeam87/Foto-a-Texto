@@ -12,6 +12,10 @@ def home():
 <title>Foto a Texto PRO</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/docx@9.5.1/build/index.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@3.0.3/dist/jspdf.umd.min.js"></script>
+
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col items-center p-4">
   <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 mt-10">
@@ -23,8 +27,16 @@ def home():
     </div>
     <button id="btn" class="w-full mt-4 bg-black text-white py-3 rounded-xl font-bold">Convertir a Texto</button>
     <div id="loading" class="hidden text-center mt-4 text-sm text-blue-600">Convirtiendo... ⏳</div>
-    <textarea id="resultado" class="w-full mt-4 h-40 p-3 border rounded-xl hidden"></textarea>
+    <textarea spellcheck="false" autocorrect="off" autocapitalize="off" id="resultado" class="w-full mt-4 h-40 p-3 border rounded-xl hidden"></textarea>
     <button id="copiar" class="hidden w-full mt-2 bg-gray-100 py-2 rounded-xl text-sm">Copiar texto</button>
+<div id="acciones" style="display:none; margin-top:12px; gap:8px; flex-wrap:wrap;">
+<button type="button" id="btnCopiar">📋 Copiar</button>
+<button type="button" id="btnWord">📄 Word</button>
+<button type="button" id="btnPdf">📕 PDF</button>
+<button type="button" id="btnWhatsapp">💬 WhatsApp</button>
+<button type="button" id="btnCompartir">📤 Compartir archivo</button>
+</div>
+
   </div>
 
   <div id="paywall" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; padding:20px;">
@@ -185,6 +197,72 @@ document.getElementById('copiar').onclick = () => {
   alert('Copiado!');
 };
 </script>
+
+<script>
+function obtenerTextoOCR(){
+  const ta=document.querySelector('#result,#resultado,textarea');
+  return ta ? ta.value : '';
+}
+function mostrarAcciones(){
+  const a=document.getElementById('acciones'); if(a) a.style.display='flex';
+}
+async function copiarOCR(){
+  const t=obtenerTextoOCR(); if(!t)return;
+  try{await navigator.clipboard.writeText(t);}catch{
+    const ta=document.querySelector('#result,#resultado,textarea');
+    ta.focus();ta.select();document.execCommand('copy');
+  }
+  alert('Texto copiado.');
+}
+async function crearWordBlob(){
+  const t=obtenerTextoOCR(), D=window.docx;
+  const children=t.split(/\r?\n/).map(x=>new D.Paragraph({children:[new D.TextRun({text:x})]}));
+  return await D.Packer.toBlob(new D.Document({sections:[{children}]}));
+}
+async function descargarWord(){
+  const b=await crearWordBlob(),u=URL.createObjectURL(b),a=document.createElement('a');
+  a.href=u;a.download='texto_ocr.docx';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);
+}
+async function crearPdfBlob(){
+  const t=obtenerTextoOCR(),{jsPDF}=window.jspdf,p=new jsPDF({unit:'mm',format:'a4'});
+  const margin=15,width=180,lineH=6;let y=margin;
+  p.setFont('helvetica','normal');p.setFontSize(11);
+  for(const line of t.split(/\r?\n/)){
+    for(const part of p.splitTextToSize(line||' ',width)){
+      if(y>282){p.addPage();y=margin;}
+      p.text(part,margin,y);y+=lineH;
+    }
+  }
+  return p.output('blob');
+}
+async function descargarPdf(){
+  const b=await crearPdfBlob(),u=URL.createObjectURL(b),a=document.createElement('a');
+  a.href=u;a.download='texto_ocr.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);
+}
+function enviarWhatsApp(){
+  const t=obtenerTextoOCR();if(!t)return;
+  window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');
+}
+async function compartirArchivo(){
+  const b=await crearPdfBlob(),f=new File([b],'texto_ocr.pdf',{type:'application/pdf'});
+  if(navigator.share && (!navigator.canShare || navigator.canShare({files:[f]}))){
+    try{await navigator.share({title:'Texto OCR',text:'Documento generado a partir de la imagen',files:[f]});return;}
+    catch(e){if(e.name==='AbortError')return;}
+  }
+  await descargarPdf();
+  alert('Se descargó el PDF para que puedas enviarlo por WhatsApp u otra app.');
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('btnCopiar')?.addEventListener('click',copiarOCR);
+  document.getElementById('btnWord')?.addEventListener('click',descargarWord);
+  document.getElementById('btnPdf')?.addEventListener('click',descargarPdf);
+  document.getElementById('btnWhatsapp')?.addEventListener('click',enviarWhatsApp);
+  document.getElementById('btnCompartir')?.addEventListener('click',compartirArchivo);
+  const ta=document.querySelector('#result,#resultado,textarea');
+  if(ta)ta.addEventListener('input',()=>{if(ta.value.trim())mostrarAcciones();});
+});
+</script>
+
 </body>
 </html>
 """
