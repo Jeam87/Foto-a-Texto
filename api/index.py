@@ -14,19 +14,24 @@ def home():
 <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@3.0.3/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col items-center p-4">
   <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 mt-10">
     <h1 class="text-2xl font-bold text-center">Foto a Texto PRO 📸➡️📝</h1>
     <p id="motor" class="text-center text-[11px] text-gray-400 mt-1">Motor: Detectando...</p>
     <p class="text-center text-sm text-gray-500 mt-1"><span id="creditos-text"></span> <span id="pro-badge" class="hidden bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs ml-1">PRO ACTIVO</span></p>
-    <div id="drop" class="mt-6 border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:bg-gray-50">
-      <input type="file" id="file" accept="image/*" capture="environment" class="hidden">
-      <p class="text-gray-600">Toca para subir foto o arrastra aquí</p>
+
+    <div id="drop" class="mt-6 border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:bg-gray-50">
+      <input type="file" id="file" accept="image/*,application/pdf,.pdf" class="hidden">
+      <p id="drop-text" class="text-gray-600">Toca para subir foto o PDF</p>
     </div>
+
     <button id="btn" class="w-full mt-4 bg-black text-white py-3 rounded-xl font-bold">Convertir a Texto</button>
     <div id="loading" class="hidden text-center mt-4 text-sm text-blue-600">Leyendo...</div>
     <textarea spellcheck="false" id="resultado" class="w-full mt-4 h-48 p-3 border rounded-xl hidden"></textarea>
+
     <div id="acciones" class="hidden mt-3 grid grid-cols-2 gap-2">
       <button type="button" id="btnCopiar" class="bg-gray-900 text-white py-3 rounded-xl text-sm font-bold">📋 Copiar</button>
       <button type="button" id="btnWhatsapp" class="bg-green-500 text-white py-3 rounded-xl text-sm font-bold">💬 WhatsApp</button>
@@ -47,6 +52,7 @@ def home():
 
 <script>
 let fileData=null;
+let fileOriginal=null;
 let motorML=false;
 if('TextDetector' in window){ motorML=true; document.getElementById('motor').innerText='Motor: ML Kit Offline ⚡ Rápido'; }
 else { document.getElementById('motor').innerText='Motor: Tesseract Offline'; }
@@ -75,10 +81,42 @@ async function prepararImagenOCR(file){
 }
 
 document.getElementById('drop').onclick=()=>document.getElementById('file').click();
-document.getElementById('file').onchange=(e)=>{
-  fileData=e.target.files[0]; if(!fileData) return;
-  const drop=document.getElementById('drop'); const old=document.getElementById('previewFoto'); if(old) old.remove();
-  const im=document.createElement('img'); im.id='previewFoto'; im.className='mx-auto mt-4 max-h-64 rounded-xl'; im.src=URL.createObjectURL(fileData); drop.appendChild(im);
+
+document.getElementById('file').onchange=async(e)=>{
+  fileOriginal=e.target.files[0];
+  if(!fileOriginal) return;
+  const drop=document.getElementById('drop');
+  const old=document.getElementById('previewFoto');
+  if(old) old.remove();
+
+  if(fileOriginal.type==='application/pdf'){
+    document.getElementById('drop-text').innerText='📄 Leyendo PDF...';
+    try{
+      const url=URL.createObjectURL(fileOriginal);
+      const pdf=await pdfjsLib.getDocument(url).promise;
+      const page=await pdf.getPage(1);
+      const viewport=page.getViewport({scale:2.5});
+      const canvas=document.createElement('canvas');
+      canvas.width=viewport.width; canvas.height=viewport.height;
+      const ctx=canvas.getContext('2d');
+      await page.render({canvasContext:ctx, viewport}).promise;
+      canvas.id='previewFoto';
+      canvas.className='mx-auto mt-4 max-h-64 rounded-xl border';
+      drop.appendChild(canvas);
+      canvas.toBlob(b=>{
+        fileData=new File([b],'pdf-page.png',{type:'image/png'});
+        document.getElementById('drop-text').innerText='📄 PDF cargado - listo para convertir';
+      },'image/png',1.0);
+    }catch(err){ alert('Error leyendo PDF: '+err.message); }
+  } else {
+    fileData=fileOriginal;
+    const im=document.createElement('img');
+    im.id='previewFoto';
+    im.className='mx-auto mt-4 max-h-64 rounded-xl';
+    im.src=URL.createObjectURL(fileData);
+    drop.appendChild(im);
+    document.getElementById('drop-text').innerText='📷 Foto lista - toca para cambiar';
+  }
 };
 
 async function reconocerMLKit(blob){
@@ -92,7 +130,7 @@ async function reconocerMLKit(blob){
 }
 
 document.getElementById('btn').onclick=async()=>{
-  if(!fileData) return alert('Sube foto primero');
+  if(!fileData) return alert('Sube foto o PDF primero');
   if(!checkPaywall()) return;
   document.getElementById('loading').classList.remove('hidden');
   document.getElementById('resultado').classList.add('hidden');
@@ -122,7 +160,7 @@ async function copiarOCR(){ const t=obtenerTexto(); if(!t) return; try{ await na
 async function descargarWord(){
   try{
     const t=obtenerTexto(); if(!t) return alert('No hay texto');
-    const D=window.docx; if(!D) return alert('docx no cargó, recarga');
+    const D=window.docx; if(!D) return alert('docx no cargó, recarga la página');
     const paras=t.split(/\\r?\\n/).map(l=>new D.Paragraph({children:[new D.TextRun(l||' ')]}));
     const doc=new D.Document({sections:[{children:paras}]});
     const blob=await D.Packer.toBlob(doc);
